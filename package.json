@@ -23,7 +23,7 @@
     "deploy": "gh-pages -d example/build"
   },
   "peerDependencies": {
-    "query-string": "^6.13.8",
+    "query-string": "^7.0.1",
     "react-admin": "^3.12.0"
   },
   "devDependencies": {
