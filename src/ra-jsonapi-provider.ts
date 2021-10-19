@@ -101,20 +101,8 @@ export const jsonapiClient = (
         query.sort = `${prefix}${params.sort.field}`;
       }
       const includes: string[] = [];
-      /* if (resource === 'Addresses') {
-        query[`include`] = 'users';
-        includes.push('users');
-      } else if (resource === 'Users') {
-        query[`include`] = 'addresses,companys';
-        includes.push('addresses');
-        includes.push('companys');
-      } */
 
       const includeRelations: includeRelations[] = settings.includeRelations;
-      /* [
-        { resource: 'Users', includes: ['addresses', 'companys'] },
-        { resource: 'Addresses', includes: ['users'] }
-      ]; */
 
       for (const ir of includeRelations) {
         if (resource === ir.resource) {
@@ -170,9 +158,11 @@ export const jsonapiClient = (
       })), */
 
     getOne: (resource: any, params: { id: any }) => {
-      const url = `${apiUrl}/${resource}/${params.id}`;
+      const url = `${apiUrl}/${resource}/${params.id}?include=%2Ball&page[limit]=50`;
       return httpClient(url).then(({ json }) => {
-        const { id, attributes } = json.data;
+        const { id, attributes, relationships } = json.data;
+        //const included = json.included;
+        Object.assign(attributes, relationships);
         return {
           data: {
             id,
@@ -220,11 +210,11 @@ export const jsonapiClient = (
       const query = {
         sort: JSON.stringify([field, order]),
         range: JSON.stringify([(page - 1) * perPage, page * perPage - 1]),
-        filter: JSON.stringify({
-          ...params.filter,
-          [params.target]: params.id
+        filter_: JSON.stringify({
+          ...params.filter
         })
       };
+      query[`filter[${params.target}]`] = params.id
       const url = `${apiUrl}/${resource}?${stringify(query)}`;
       const options = {};
       /* countHeader === 'Content-Range'
@@ -238,12 +228,12 @@ export const jsonapiClient = (
 
       return httpClient(url, options).then(({ headers, json }) => {
         if (!headers.has(countHeader)) {
-          throw new Error(
+          console.debug(
             `The ${countHeader} header is missing in the HTTP Response. The simple REST data provider expects responses for lists of resources to contain this header with the total number of results to build the pagination. If you are using CORS, did you declare ${countHeader} in the Access-Control-Expose-Headers header?`
           );
         }
         return {
-          data: json,
+          data: json.data,
           total: 100
           /*  countHeader === 'Content-Range'
               ? parseInt(
@@ -377,7 +367,20 @@ export const jsonapiClient = (
         )
       ).then((responses) => ({
         data: responses.map(({ json }) => json.id)
-      }))
+      })),
+
+    getResources: () => {
+        const conf = localStorage.getItem('raconf');
+        if(conf && JSON.parse(conf)){
+            return Promise.resolve({data: JSON.parse(conf)});
+        };
+        return httpClient(`${apiUrl}/schema`, {
+            method: 'GET'
+        }).then(({json}) => {
+            localStorage.setItem('raconf', JSON.stringify(json));
+            return { data: json };
+        })}
+    
   };
 };
 
