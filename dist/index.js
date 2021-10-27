@@ -300,9 +300,16 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
   }
 
   var settings = deepmerge_1(defaultSettings, userSettings);
-  var conf = JSON.parse(localStorage.getItem('raconf') || "") || {
+  var conf = {
     "resources": {}
   };
+
+  try {
+    conf = JSON.parse(localStorage.getItem('raconf') || "");
+  } catch (e) {
+    console.warn("Failed to parse config");
+  }
+
   return {
     getList: function getList(resource, params) {
       var _params$filter;

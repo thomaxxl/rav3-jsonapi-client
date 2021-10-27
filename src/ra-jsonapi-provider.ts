@@ -55,8 +55,14 @@ export const jsonapiClient = (
   countHeader: string = 'Content-Range'
 ): DataProvider => {
   const settings = merge(defaultSettings, userSettings);
-  const conf = JSON.parse(localStorage.getItem('raconf')||"") || {"resources" : {}};
-
+  let conf = {"resources" : {}};
+  try{
+    conf = JSON.parse(localStorage.getItem('raconf')||"");
+  }
+  catch(e){
+    console.warn("Failed to parse config");
+  }
+  
   return {
     getList: (resource, params) => {
       /* const { page, perPage } = params.pagination
