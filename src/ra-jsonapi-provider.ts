@@ -96,7 +96,12 @@ export const jsonapiClient = (
       // Add all filter params to query.
       if(params.filter?.q){
         // search is requested by react-admin
-        query['filter'] = JSON.stringify([{"name":"ProductName","op":"like","val":`${params.filter.q}%`}])
+        const search_cols = conf.resources[resource].search_cols || [];
+        query['filter'] = JSON.stringify(search_cols.map((col_name: string) => {return { 
+                              "name":col_name,
+                              "op":"like",
+                              "val":`${params.filter.q}%`};})
+            )
       }
       else{
         Object.keys(params.filter || {}).forEach((key) => {

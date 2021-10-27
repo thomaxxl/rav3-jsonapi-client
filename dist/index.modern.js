@@ -320,11 +320,14 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
       };
 
       if ((_params$filter = params.filter) !== null && _params$filter !== void 0 && _params$filter.q) {
-        query['filter'] = JSON.stringify([{
-          "name": "ProductName",
-          "op": "like",
-          "val": params.filter.q + "%"
-        }]);
+        var search_cols = conf.resources[resource].search_cols || [];
+        query['filter'] = JSON.stringify(search_cols.map(function (col_name) {
+          return {
+            "name": col_name,
+            "op": "like",
+            "val": params.filter.q + "%"
+          };
+        }));
       } else {
         Object.keys(params.filter || {}).forEach(function (key) {
           query["filter[" + key + "]"] = params.filter[key];
