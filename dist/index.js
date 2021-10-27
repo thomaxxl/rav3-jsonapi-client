@@ -107,55 +107,20 @@ function defaultArrayMerge(target, source, options) {
   });
 }
 
-function getMergeFunction(key, options) {
-  if (!options.customMerge) {
-    return deepmerge;
-  }
-
-  var customMerge = options.customMerge(key);
-  return typeof customMerge === 'function' ? customMerge : deepmerge;
-}
-
-function getEnumerableOwnPropertySymbols(target) {
-  return Object.getOwnPropertySymbols ? Object.getOwnPropertySymbols(target).filter(function (symbol) {
-    return target.propertyIsEnumerable(symbol);
-  }) : [];
-}
-
-function getKeys(target) {
-  return Object.keys(target).concat(getEnumerableOwnPropertySymbols(target));
-}
-
-function propertyIsOnObject(object, property) {
-  try {
-    return property in object;
-  } catch (_) {
-    return false;
-  }
-}
-
-function propertyIsUnsafe(target, key) {
-  return propertyIsOnObject(target, key) && !(Object.hasOwnProperty.call(target, key) && Object.propertyIsEnumerable.call(target, key));
-}
-
 function mergeObject(target, source, options) {
   var destination = {};
 
   if (options.isMergeableObject(target)) {
-    getKeys(target).forEach(function (key) {
+    Object.keys(target).forEach(function (key) {
       destination[key] = cloneUnlessOtherwiseSpecified(target[key], options);
     });
   }
 
-  getKeys(source).forEach(function (key) {
-    if (propertyIsUnsafe(target, key)) {
-      return;
-    }
-
-    if (propertyIsOnObject(target, key) && options.isMergeableObject(source[key])) {
-      destination[key] = getMergeFunction(key, options)(target[key], source[key], options);
-    } else {
+  Object.keys(source).forEach(function (key) {
+    if (!options.isMergeableObject(source[key]) || !target[key]) {
       destination[key] = cloneUnlessOtherwiseSpecified(source[key], options);
+    } else {
+      destination[key] = deepmerge(target[key], source[key], options);
     }
   });
   return destination;
@@ -165,7 +130,6 @@ function deepmerge(target, source, options) {
   options = options || {};
   options.arrayMerge = options.arrayMerge || defaultArrayMerge;
   options.isMergeableObject = options.isMergeableObject || isMergeableObject;
-  options.cloneUnlessOtherwiseSpecified = cloneUnlessOtherwiseSpecified;
   var sourceIsArray = Array.isArray(source);
   var targetIsArray = Array.isArray(target);
   var sourceAndTargetTypesMatch = sourceIsArray === targetIsArray;
@@ -190,7 +154,6 @@ deepmerge.all = function deepmergeAll(array, options) {
 };
 
 var deepmerge_1 = deepmerge;
-var cjs = deepmerge_1;
 
 var SafrsHttpError = /*#__PURE__*/function (_HttpError) {
   _inheritsLoose(SafrsHttpError, _HttpError);
@@ -336,12 +299,18 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
     countHeader = 'Content-Range';
   }
 
-  var settings = cjs(defaultSettings, userSettings);
+  var settings = deepmerge_1(defaultSettings, userSettings);
+  var conf = JSON.parse(localStorage.getItem('raconf') || "") || {
+    "resources": {}
+  };
   return {
     getList: function getList(resource, params) {
+      var _params$filter;
+
       var _params$pagination = params.pagination,
           page = _params$pagination.page,
           perPage = _params$pagination.perPage;
+      console.log(page, perPage);
       var query = {
         'page[number]': page,
         'page[size]': perPage,
@@ -349,9 +318,18 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
         'page[limit]': perPage,
         sort: ' '
       };
-      Object.keys(params.filter || {}).forEach(function (key) {
-        query["filter[" + key + "]"] = params.filter[key];
-      });
+
+      if ((_params$filter = params.filter) !== null && _params$filter !== void 0 && _params$filter.q) {
+        query['filter'] = JSON.stringify([{
+          "name": "ProductName",
+          "op": "like",
+          "val": params.filter.q + "%"
+        }]);
+      } else {
+        Object.keys(params.filter || {}).forEach(function (key) {
+          query["filter[" + key + "]"] = params.filter[key];
+        });
+      }
 
       if (params.sort && params.sort.field) {
         var prefix = params.sort.order === 'ASC' ? '' : '-';
@@ -470,7 +448,7 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
       });
     },
     update: function update(resource, params) {
-      var type = resource;
+      var type = conf["resources"][resource].type;
       var arr = settings.endpointToTypeStripLastLetters;
 
       for (var i in arr) {
@@ -588,11 +566,9 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
       });
     },
     getResources: function getResources() {
-      var conf = localStorage.getItem('raconf');
-
-      if (conf && JSON.parse(conf)) {
+      if (conf) {
         return Promise.resolve({
-          data: JSON.parse(conf)
+          data: conf
         });
       }
       return httpClient(apiUrl + "/schema", {
@@ -602,6 +578,10 @@ var jsonapiClient = function jsonapiClient(apiUrl, userSettings, httpClient, cou
         localStorage.setItem('raconf', JSON.stringify(json));
         return {
           data: json
+        };
+      }).catch(function () {
+        return {
+          data: {}
         };
       });
     }

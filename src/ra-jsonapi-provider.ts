@@ -55,6 +55,8 @@ export const jsonapiClient = (
   countHeader: string = 'Content-Range'
 ): DataProvider => {
   const settings = merge(defaultSettings, userSettings);
+  const conf = JSON.parse(localStorage.getItem('raconf')||"") || {"resources" : {}};
+
   return {
     getList: (resource, params) => {
       /* const { page, perPage } = params.pagination
@@ -80,6 +82,7 @@ export const jsonapiClient = (
         : {} */
 
       const { page, perPage } = params.pagination;
+      console.log(page, perPage);
 
       // Create query with pagination params.
       const query = {
@@ -91,9 +94,15 @@ export const jsonapiClient = (
       };
 
       // Add all filter params to query.
-      Object.keys(params.filter || {}).forEach((key) => {
-        query[`filter[${key}]`] = params.filter[key];
-      });
+      if(params.filter?.q){
+        // search is requested by react-admin
+        query['filter'] = JSON.stringify([{"name":"ProductName","op":"like","val":`${params.filter.q}%`}])
+      }
+      else{
+        Object.keys(params.filter || {}).forEach((key) => {
+          query[`filter[${key}]`] = params.filter[key];
+        });
+      }
 
       // Add sort parameter
       if (params.sort && params.sort.field) {
@@ -247,7 +256,7 @@ export const jsonapiClient = (
     },
 
     update: (resource, params) => {
-      let type = resource;
+      let type = conf["resources"][resource].type;
       const arr = settings.endpointToTypeStripLastLetters;
       for (const i in arr) {
         if (resource.endsWith(arr[i])) {
@@ -370,16 +379,18 @@ export const jsonapiClient = (
       })),
 
     getResources: () => {
-        const conf = localStorage.getItem('raconf');
-        if(conf && JSON.parse(conf)){
-            return Promise.resolve({data: JSON.parse(conf)});
+        
+        if(conf){
+            return Promise.resolve({data: conf});
         };
         return httpClient(`${apiUrl}/schema`, {
             method: 'GET'
         }).then(({json}) => {
             localStorage.setItem('raconf', JSON.stringify(json));
             return { data: json };
-        })}
+        })
+        .catch(()=> {return {data : {}} })
+      }
     
   };
 };
